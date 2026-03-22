@@ -29,4 +29,19 @@ class RandomBuilder(Builder):
         3. Greedily pack until gas limit reached
         4. Return packed list (no injected txns)
         """
-        raise NotImplementedError  # TODO
+        txns = mempool.get_transactions()
+        self._rng.shuffle(txns)
+
+        block = []
+        gas_used = 0
+        gas_per_txn = 21_000
+
+        for tx in txns:
+            if tx.amount_in is None:
+                continue
+            if gas_used + gas_per_txn > block_gas_limit:
+                break
+            block.append(tx)
+            gas_used += gas_per_txn
+
+        return block

@@ -6,6 +6,8 @@ See PLAN.md §2 for full field spec and visibility semantics.
 import uuid
 from dataclasses import dataclass, field
 
+_MAX_DEADLINE_HORIZON = 10  # blocks; used for deadline urgency normalization
+
 
 @dataclass
 class Transaction:
@@ -52,4 +54,28 @@ class Transaction:
         Construct a fully visible transaction with auto-computed metadata.
         size_thresholds: (small_max, medium_max) in base units.
         """
-        raise NotImplementedError  # TODO: compute metadata fields and return instance
+        small_max, medium_max = size_thresholds
+        if amount_in <= small_max:
+            bucket = "small"
+        elif amount_in <= medium_max:
+            bucket = "medium"
+        else:
+            bucket = "large"
+
+        blocks_until_deadline = max(0, deadline - current_block)
+        urgency = max(0.0, 1.0 - blocks_until_deadline / _MAX_DEADLINE_HORIZON)
+
+        return cls(
+            sender=sender,
+            token_in=token_in,
+            token_out=token_out,
+            amount_in=amount_in,
+            min_amount_out=min_amount_out,
+            gas_price=gas_price,
+            deadline=deadline,
+            metadata_gas_price=gas_price,
+            metadata_size_bucket=bucket,
+            metadata_token_pair=f"{token_in}/{token_out}",
+            metadata_deadline_urgency=urgency,
+            payload_visible=True,
+        )

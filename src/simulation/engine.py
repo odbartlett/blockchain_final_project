@@ -45,7 +45,45 @@ def generate_transactions(
 
     See PLAN.md §12 for details.
     """
-    raise NotImplementedError  # TODO
+    log_mean = np.log(config.trade_size_mean)
+    txns = []
+
+    for _ in range(n):
+        # Draw trade size from log-normal
+        amount_in = max(1, int(np_rng.lognormal(mean=log_mean, sigma=config.trade_size_sigma)))
+
+        # Draw gas price from Pareto (fat-tailed)
+        gas_price = int((np_rng.pareto(config.gas_price_pareto_alpha) + 1) * config.gas_cost_per_txn)
+
+        # Random token pair
+        pair = rng.choice(config.token_pairs)
+        token_in, token_out = pair.split("/")
+
+        # Deadline 1-10 blocks ahead
+        deadline = block_number + rng.randint(1, 10)
+
+        # Compute min_amount_out using initial reserves as proxy for current price.
+        # This gives the correct AMM quote (with fee and price impact) * (1 - tolerance).
+        # Uses initial reserves since generate_transactions has no live pool access.
+        x0 = config.initial_reserves_x
+        y0 = config.initial_reserves_y
+        amount_in_eff = amount_in * (1 - config.amm_fee)
+        estimated_out = int(amount_in_eff * y0 / (x0 + amount_in_eff))
+        min_amount_out = max(1, int(estimated_out * (1 - config.slippage_tolerance)))
+
+        txn = Transaction.from_visible(
+            sender=f"user_{rng.randint(0, 99999)}",
+            token_in=token_in,
+            token_out=token_out,
+            amount_in=amount_in,
+            min_amount_out=min_amount_out,
+            gas_price=gas_price,
+            deadline=deadline,
+            current_block=block_number,
+        )
+        txns.append(txn)
+
+    return txns
 
 
 def make_builders(config: SimConfig) -> dict:

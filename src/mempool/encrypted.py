@@ -3,6 +3,7 @@ Threshold-encrypted mempool: payload hidden, metadata visible (I = 0.0).
 
 See PLAN.md §3.
 """
+import dataclasses
 from .transaction import Transaction
 
 
@@ -21,9 +22,14 @@ class EncryptedMempool:
         """Return transactions with payload fields redacted."""
         result = []
         for t in self._txns:
-            # Return a shallow copy with payload fields nulled out
-            # TODO: use dataclasses.replace to create a redacted copy
-            raise NotImplementedError
+            redacted = dataclasses.replace(
+                t,
+                sender=None,
+                amount_in=None,
+                min_amount_out=None,
+                payload_visible=False,
+            )
+            result.append(redacted)
         return result
 
     def __len__(self) -> int:

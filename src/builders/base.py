@@ -5,7 +5,7 @@ See PLAN.md §4.
 """
 from abc import ABC, abstractmethod
 from ..amm.pool import AMMPool
-from ..transaction import Transaction  # type: ignore[import]
+from ..mempool.transaction import Transaction
 
 
 class Builder(ABC):
@@ -38,14 +38,33 @@ class Builder(ABC):
     def compute_mev(self, block: list, pool: AMMPool) -> float:
         """
         Execute the block sequentially against a pool fork.
-        Returns total profit (in y-token units) from the builder's
-        own injected transactions.
+        Returns total profit (in token_x units) from the builder's
+        own injected transactions (sender == "BUILDER").
 
-        Algorithm:
-        1. Fork the pool
-        2. For each transaction in block order:
-           a. Execute swap against fork
-           b. If tx.sender == "BUILDER", track balance delta as MEV
-        3. Return sum of builder balance deltas
+        Tracks the builder's wallet:
+          - When builder spends token_x: wallet_x -= amount_in
+          - When builder receives token_x: wallet_x += amount_out
+          - Same for token_y
+        Final MEV = wallet_x + wallet_y * (reserve_x / reserve_y)
         """
-        raise NotImplementedError  # TODO
+        fork = pool.fork()
+        wallet_x: float = 0.0
+        wallet_y: float = 0.0
+
+        for tx in block:
+            if tx.amount_in is None:
+                continue
+            amount_out = fork.swap(tx.token_in, tx.amount_in)
+
+            if getattr(tx, "sender", None) == "BUILDER":
+                if tx.token_in == fork.token_x:
+                    wallet_x -= tx.amount_in
+                    wallet_y += amount_out
+                else:
+                    wallet_y -= tx.amount_in
+                    wallet_x += amount_out
+
+        # Convert any remaining token_y balance to token_x at current pool price
+        if fork.reserve_y > 0:
+            wallet_x += wallet_y * fork.reserve_x / fork.reserve_y
+        return wallet_x

@@ -3,6 +3,7 @@ Partial-information mempool: metadata leakage with optional noise (I ∈ (0,1)).
 
 See PLAN.md §3 for the mapping between I, leakage_rate, and noise_sigma.
 """
+import dataclasses
 import random
 from .transaction import Transaction
 
@@ -40,9 +41,27 @@ class PartialMempool:
 
         For revealed transactions: payload_visible=True, exact amount_in.
         For hidden transactions: payload_visible=False,
-            amount_in = noisy estimate drawn from N(true, noise_sigma * true).
+            amount_in = noisy estimate drawn from N(true, noise_sigma * true),
+            clamped to >= 1.
         """
-        raise NotImplementedError  # TODO
+        result = []
+        for t in self._txns:
+            if self._rng.random() < self.leakage_rate:
+                # Fully revealed
+                result.append(dataclasses.replace(t, payload_visible=True))
+            else:
+                # Metadata only; noisy amount estimate
+                true_amount = t.amount_in or 0
+                noise = self._rng.gauss(0, self.noise_sigma * true_amount)
+                noisy_amount = max(1, int(true_amount + noise))
+                result.append(dataclasses.replace(
+                    t,
+                    sender=None,
+                    amount_in=noisy_amount,
+                    min_amount_out=None,
+                    payload_visible=False,
+                ))
+        return result
 
     def __len__(self) -> int:
         return len(self._txns)
