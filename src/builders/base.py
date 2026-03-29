@@ -3,9 +3,29 @@ Abstract builder interface.
 
 See PLAN.md §4.
 """
+import uuid
 from abc import ABC, abstractmethod
 from ..amm.pool import AMMPool
 from ..mempool.transaction import Transaction
+
+
+def make_builder_txn(token_in: str, token_out: str, amount_in: int) -> Transaction:
+    """Create a builder-injected transaction with sentinel sender='BUILDER'."""
+    return Transaction(
+        sender="BUILDER",
+        token_in=token_in,
+        token_out=token_out,
+        amount_in=amount_in,
+        min_amount_out=1,
+        gas_price=0,
+        deadline=10**9,
+        metadata_gas_price=0,
+        metadata_size_bucket="large",
+        metadata_token_pair=f"{token_in}/{token_out}",
+        metadata_deadline_urgency=0.0,
+        payload_visible=True,
+        tx_id=str(uuid.uuid4()),
+    )
 
 
 class Builder(ABC):

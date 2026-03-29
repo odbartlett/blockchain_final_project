@@ -19,9 +19,13 @@ class SimConfig:
     trade_size_sigma: float = 1.5         # spread of log-normal
     slippage_tolerance: float = 0.01      # 1% default
     gas_price_pareto_alpha: float = 2.0   # Pareto shape for gas prices
-    gas_cost_per_txn: int = 21_000        # base units (wei-equivalent)
+    gas_cost_per_txn: int = 21_000        # gas CAPACITY per txn (block packing, not token cost)
+    mev_gas_token_cost: float = 2.0       # token-unit cost per injected MEV txn (front or back run)
+    # Both directions so the pool price random-walks around equilibrium
+    # rather than trending to zero. All pairs must use the same two tokens
+    # as the single AMM pool (token_x / token_y).
     token_pairs: list[str] = field(
-        default_factory=lambda: ["ETH/USDC", "ETH/DAI", "USDC/DAI"]
+        default_factory=lambda: ["ETH/USDC", "USDC/ETH"]
     )
 
     # --- Information regime ---

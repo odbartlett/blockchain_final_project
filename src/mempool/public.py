@@ -18,5 +18,9 @@ class PublicMempool:
             t.payload_visible = True
         return list(self._txns)
 
+    def reveal_transaction(self, tx: Transaction) -> Transaction:
+        """Return fully visible transaction (already public)."""
+        return tx
+
     def __len__(self) -> int:
         return len(self._txns)

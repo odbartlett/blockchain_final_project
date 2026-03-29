@@ -17,6 +17,7 @@ class EncryptedMempool:
 
     def __init__(self, transactions: list[Transaction]):
         self._txns = transactions
+        self._by_id = {t.tx_id: t for t in transactions}
 
     def get_transactions(self) -> list[Transaction]:
         """Return transactions with payload fields redacted."""
@@ -31,6 +32,10 @@ class EncryptedMempool:
             )
             result.append(redacted)
         return result
+
+    def reveal_transaction(self, tx: Transaction) -> Transaction:
+        """Return the original unredacted transaction. Used by ColludingBuilder."""
+        return self._by_id.get(tx.tx_id, tx)
 
     def __len__(self) -> int:
         return len(self._txns)

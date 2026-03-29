@@ -31,6 +31,7 @@ class PartialMempool:
         rng: random.Random | None = None,
     ):
         self._txns = transactions
+        self._by_id = {t.tx_id: t for t in transactions}
         self.leakage_rate = leakage_rate
         self.noise_sigma = noise_sigma
         self._rng = rng or random.Random()
@@ -62,6 +63,10 @@ class PartialMempool:
                     payload_visible=False,
                 ))
         return result
+
+    def reveal_transaction(self, tx: Transaction) -> Transaction:
+        """Return the original unredacted transaction. Used by ColludingBuilder."""
+        return self._by_id.get(tx.tx_id, tx)
 
     def __len__(self) -> int:
         return len(self._txns)

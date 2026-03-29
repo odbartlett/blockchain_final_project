@@ -6,32 +6,11 @@ Under encrypted/partial information, falls back to fee-maximizing order.
 
 See PLAN.md §6 for algorithm and closed-form formulas.
 """
-import uuid
-from .base import Builder
+from .base import Builder, make_builder_txn
 from ..amm.pool import AMMPool
-from ..mempool.transaction import Transaction
 from ..mev.sandwich import find_sandwich_opportunities
 
 _GAS_PER_TXN = 21_000
-
-
-def _make_builder_txn(token_in: str, token_out: str, amount_in: int) -> Transaction:
-    """Create a builder-injected transaction with minimal metadata."""
-    return Transaction(
-        sender="BUILDER",
-        token_in=token_in,
-        token_out=token_out,
-        amount_in=amount_in,
-        min_amount_out=1,
-        gas_price=0,
-        deadline=10**9,
-        metadata_gas_price=0,
-        metadata_size_bucket="large",
-        metadata_token_pair=f"{token_in}/{token_out}",
-        metadata_deadline_urgency=0.0,
-        payload_visible=True,
-        tx_id=str(uuid.uuid4()),
-    )
 
 
 class MaximalBuilder(Builder):
@@ -84,8 +63,8 @@ class MaximalBuilder(Builder):
             # Back-run: builder sells the y_received back for token_x
             back_amount = y_received
 
-            front_txn = _make_builder_txn(pool.token_x, pool.token_y, op.front_amount)
-            back_txn = _make_builder_txn(pool.token_y, pool.token_x, back_amount)
+            front_txn = make_builder_txn(pool.token_x, pool.token_y, op.front_amount)
+            back_txn = make_builder_txn(pool.token_y, pool.token_x, back_amount)
 
             block.append(front_txn)
             block.append(op.victim_txn)

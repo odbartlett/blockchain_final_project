@@ -34,6 +34,7 @@ class SimulationResults:
     config_liquidity: int
     config_alpha: float
     builder_type: str
+    config_collusion_cost: float = 0.0
 
     block_metrics: list[BlockMetrics] = field(default_factory=list)
 
@@ -60,6 +61,7 @@ class SimulationResults:
             "information_param": self.config_info_param,
             "liquidity": self.config_liquidity,
             "alpha": self.config_alpha,
+            "collusion_cost": self.config_collusion_cost,
             "builder_type": self.builder_type,
             "mev_rate": self.mev_rate(),
             "user_harm_rate": self.user_harm_rate(),

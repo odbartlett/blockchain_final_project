@@ -34,14 +34,40 @@ def run_pbs_auction(
     builder_margin: float = 0.1,   # fraction of block value kept by builder
 ) -> AuctionResult:
     """
-    1. Each builder calls build_block() on their mempool view
-    2. Each builder computes block value = MEV + total fees
+    PBS auction mechanism:
+    1. Each builder calls build_block() on the same mempool view
+    2. Compute block_value = MEV extracted + total user fees in the block
     3. Bid = block_value * (1 - builder_margin)
     4. Highest bid wins
-    5. Return AuctionResult with winner and all bids
+    5. Returns AuctionResult with winner, winning block, all bids
 
-    Note: all builders receive the same mempool object, but builders
-    operating in encrypted/partial regimes will only see the metadata
-    they are entitled to (enforced by the mempool's get_transactions()).
+    All builders see the same mempool object; the mempool enforces information
+    restrictions via get_transactions() (e.g. EncryptedMempool redacts payloads).
     """
-    raise NotImplementedError  # TODO
+    bids: list[BuilderBid] = []
+
+    for builder in builders:
+        block = builder.build_block(mempool, pool.fork(), block_gas_limit)
+        mev = builder.compute_mev(block, pool.fork())
+
+        # Total user gas fees in the block (from non-BUILDER transactions)
+        user_fees = sum(
+            t.gas_price
+            for t in block
+            if getattr(t, "sender", None) != "BUILDER" and t.amount_in is not None
+        )
+
+        block_value = max(0.0, mev + user_fees)
+        bid_amount = block_value * (1.0 - builder_margin)
+
+        bids.append(BuilderBid(builder=builder, block=block, bid_amount=bid_amount))
+
+    # Highest bid wins; tie-break by builder name for determinism
+    winning_bid = max(bids, key=lambda b: (b.bid_amount, b.builder.name))
+
+    return AuctionResult(
+        winner=winning_bid.builder,
+        winning_block=winning_bid.block,
+        winning_bid=winning_bid.bid_amount,
+        all_bids=bids,
+    )
