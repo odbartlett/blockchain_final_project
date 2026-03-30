@@ -37,6 +37,10 @@ def figure1_mev_recovery_curve(df: pd.DataFrame):
     """MEV recovery curve: normalized MEV vs I, per builder type."""
     fig, ax = plt.subplots(figsize=(7, 5))
 
+    # Filter to collusion_cost=0 so the Figure 3 sweep rows (which vary cost and
+    # include many zero-MEV entries) don't contaminate the baseline or the series.
+    df = df[df["collusion_cost"] == 0].copy()
+
     # Normalize by I=1.0 value per builder type
     baseline = df[df["information_param"] == 1.0].groupby("builder_type")["mev_rate"].mean()
 
@@ -90,20 +94,45 @@ def figure3_collusion_breakeven(df: pd.DataFrame):
         print("  [figure3] No colluding builder rows — skipping.")
         return None
 
-    fig, ax = plt.subplots(figsize=(7, 5))
+    # Two panels: zoomed linear (left) + full log scale (right)
+    fig, (ax_zoom, ax_log) = plt.subplots(1, 2, figsize=(13, 5))
     i_colors = {0.0: "blue", 0.5: "orange", 1.0: "red"}
 
+    series = {}
     for I, color in i_colors.items():
         grp = subset[subset["information_param"] == I].groupby("collusion_cost")["mev_rate"].mean()
         if grp.empty:
             continue
-        ax.plot(grp.index, grp.values, marker="o", markersize=4, color=color, label=f"I = {I}")
+        series[I] = (grp, color)
 
-    ax.axhline(0, linestyle="--", color="black", alpha=0.4, linewidth=1)
-    ax.set_xlabel("Collusion Cost per Transaction c")
-    ax.set_ylabel("Mean Net MEV per block")
-    ax.set_title("Figure 3: Collusion Breakeven Cost")
-    ax.legend(title="Info param I")
+    for ax in (ax_zoom, ax_log):
+        for I, (grp, color) in series.items():
+            ax.plot(grp.index, grp.values, marker="o", markersize=5,
+                    linewidth=2, color=color, label=f"I = {I}")
+        ax.axhline(0, linestyle="--", color="black", alpha=0.5, linewidth=1)
+        ax.set_ylabel("Mean Net MEV per block")
+        ax.legend(title="Info param I")
+
+    # Left panel: zoom into 0–25 where the drop-off actually occurs
+    all_vals = [v for grp, _ in series.values() for v in grp.values]
+    y_max = max(all_vals) if all_vals else 1000
+    ax_zoom.set_xlim(-0.5, 25)
+    ax_zoom.set_ylim(-y_max * 0.05, y_max * 1.12)
+    ax_zoom.set_xlabel("Collusion Cost per Transaction c")
+    ax_zoom.set_title("Breakeven region (zoomed)")
+
+    # Right panel: log x-axis to show full cost range, skip cost=0 for log
+    for I, (grp, color) in series.items():
+        nonzero = grp[grp.index > 0]
+        ax_log.plot(nonzero.index, nonzero.values, marker="o", markersize=5,
+                    linewidth=2, color=color)
+    ax_log.set_xscale("log")
+    ax_log.set_xlim(0.8, 3000)
+    ax_log.set_ylim(-y_max * 0.05, y_max * 1.12)
+    ax_log.set_xlabel("Collusion Cost per Transaction c (log scale)")
+    ax_log.set_title("Full cost range (log scale)")
+
+    fig.suptitle("Figure 3: Collusion Breakeven Cost", fontsize=13, fontweight="bold", y=1.01)
     plt.tight_layout()
     return fig
 
